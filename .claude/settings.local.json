@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze:*)",
+      "Bash(printf:*)",
+      "Bash(dart run:*)"
+    ]
+  }
+}
