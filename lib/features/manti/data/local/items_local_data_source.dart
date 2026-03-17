@@ -140,8 +140,11 @@ class ItemsLocalDataSource {
   }
 
   Future<void> deleteAll() async {
-    await _isar.writeTxn(() async {
-      await _isar.mantiItemIsars.clear();
-    });
+    await _isar.writeTxn(() => _isar.mantiItemIsars.clear());
+  }
+
+  Future<void> insertAll(List<MantiItem> items) async {
+    final models = items.map(MantiItemIsar.fromDomain).toList();
+    await _isar.writeTxn(() => _isar.mantiItemIsars.putAll(models));
   }
 }

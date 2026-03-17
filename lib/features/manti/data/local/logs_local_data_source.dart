@@ -67,4 +67,13 @@ class LogsLocalDataSource {
     });
   }
 
+  Future<void> deleteAll() async {
+    await _isar.writeTxn(() => _isar.maintenanceLogIsars.clear());
+  }
+
+  Future<void> insertAll(List<MaintenanceLog> logs) async {
+    final models = logs.map(MaintenanceLogIsar.fromDomain).toList();
+    await _isar.writeTxn(() => _isar.maintenanceLogIsars.putAll(models));
+  }
+
 }

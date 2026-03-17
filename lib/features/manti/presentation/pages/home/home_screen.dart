@@ -6,6 +6,7 @@ import 'package:manti/core/ui/buttons/manti_glass_fab.dart';
 import 'package:manti/features/manti/domain/entities/manti_item.dart';
 import 'package:manti/features/manti/presentation/cubit/items_cubit.dart';
 import 'package:manti/features/manti/presentation/cubit/items_state.dart';
+import '../backup/backup_sheet.dart';
 import '../new_item/new_item_sheet.dart' show showNewItemSheet;
 import 'home_exports.dart';
 
@@ -50,25 +51,39 @@ class _HomeContent extends StatelessWidget {
                 // Greeting header
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 8, 4, 20),
-                  child: Column(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Hola 👋',
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
-                          height: 1.1,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Hola 👋',
+                              style: TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                                height: 1.1,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _todayLabel(),
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Colors.black.withValues(alpha: 0.35),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _todayLabel(),
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.black.withValues(alpha: 0.35),
-                          fontWeight: FontWeight.w500,
+                      IconButton(
+                        onPressed: () => showBackupSheet(context),
+                        icon: Icon(
+                          Icons.more_horiz_rounded,
+                          color: Colors.black.withValues(alpha: 0.3),
                         ),
                       ),
                     ],
