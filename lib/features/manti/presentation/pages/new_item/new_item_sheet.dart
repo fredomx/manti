@@ -170,6 +170,7 @@ class _ItemSheetState extends State<_ItemSheet> {
 
                   TextFormField(
                     controller: _nameController,
+                    textCapitalization: TextCapitalization.sentences,
                     style: const TextStyle(fontWeight: FontWeight.w600),
                     decoration: InputDecoration(
                       hintText: 'Ej. Toyota Corolla 2026',
@@ -211,6 +212,7 @@ class _ItemSheetState extends State<_ItemSheet> {
                     Gaps.v12,
                     TextField(
                       controller: _customCategoryController,
+                      textCapitalization: TextCapitalization.sentences,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 15,

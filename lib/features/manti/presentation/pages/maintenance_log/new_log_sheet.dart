@@ -612,6 +612,7 @@ class _PillField extends StatelessWidget {
       maxLines: maxLines,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
+      textCapitalization: TextCapitalization.sentences,
       onSubmitted: (_) {
         if (textInputAction == TextInputAction.done) {
           FocusScope.of(context).unfocus();
