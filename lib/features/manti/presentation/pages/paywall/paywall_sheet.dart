@@ -38,8 +38,6 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   Future<void> _loadPackage() async {
     try {
       final offerings = await Purchases.getOfferings();
-      debugPrint('[Paywall] current offering: ${offerings.current?.identifier}');
-      debugPrint('[Paywall] packages: ${offerings.current?.availablePackages.map((p) => p.identifier).toList()}');
       if (mounted) {
         setState(() {
           _package = offerings.current?.availablePackages.firstOrNull;
@@ -47,8 +45,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
           _loadError = _package == null;
         });
       }
-    } catch (e) {
-      debugPrint('[Paywall] error loading offerings: $e');
+    } catch (_) {
       if (mounted) setState(() { _loadingPackage = false; _loadError = true; });
     }
   }
