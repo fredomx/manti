@@ -20,8 +20,8 @@ class EntitlementsService {
     _isPro = info.entitlements.active.containsKey('pro');
   }
 
-  Future<bool> purchase(Package package) async {
-    final result = await Purchases.purchase(PurchaseParams.package(package));
+  Future<bool> purchase(StoreProduct product) async {
+    final result = await Purchases.purchaseStoreProduct(product);
     _update(result.customerInfo);
     return _isPro;
   }

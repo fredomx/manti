@@ -2,8 +2,13 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:manti/core/config/app_config.dart';
+import 'package:manti/core/config/app_constants.dart';
 import 'package:manti/core/services/entitlements_service.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+
+// Product ID is fetched directly from StoreKit — bypasses RevenueCat backend
+// validation so purchases work even before Apple formally approves the IAP.
+
 
 /// Shows the paywall and returns `true` if the user successfully unlocks Pro.
 Future<bool> showPaywallSheet(BuildContext context) async {
@@ -24,7 +29,7 @@ class _PaywallSheet extends StatefulWidget {
 }
 
 class _PaywallSheetState extends State<_PaywallSheet> {
-  Package? _package;
+  StoreProduct? _product;
   bool _loadingPackage = true;
   bool _loadError = false;
   bool _purchasing = false;
@@ -37,12 +42,12 @@ class _PaywallSheetState extends State<_PaywallSheet> {
 
   Future<void> _loadPackage() async {
     try {
-      final offerings = await Purchases.getOfferings();
+      final products = await Purchases.getProducts([AppConstants.iapProProductId]);
       if (mounted) {
         setState(() {
-          _package = offerings.current?.availablePackages.firstOrNull;
+          _product = products.firstOrNull;
           _loadingPackage = false;
-          _loadError = _package == null;
+          _loadError = _product == null;
         });
       }
     } catch (_) {
@@ -51,11 +56,11 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   }
 
   Future<void> _purchase() async {
-    final package = _package;
-    if (package == null) return;
+    final product = _product;
+    if (product == null) return;
     setState(() => _purchasing = true);
     try {
-      final bought = await EntitlementsService.instance.purchase(package);
+      final bought = await EntitlementsService.instance.purchase(product);
       if (mounted) Navigator.of(context).pop(bought);
     } on PurchasesError catch (e) {
       if (e.code == PurchasesErrorCode.purchaseCancelledError) {
@@ -95,7 +100,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
   }
 
   String get _priceLabel {
-    final price = _package?.storeProduct.priceString;
+    final price = _product?.priceString;
     if (price == null) return 'Obtener Pro';
     return 'Una sola compra · $price';
   }
@@ -228,23 +233,49 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                                       color: Colors.black.withValues(alpha: 0.4),
                                     ),
                                   ),
-                                  const SizedBox(height: 12),
-                                  FilledButton(
-                                    onPressed: () {
+                                  const SizedBox(height: 16),
+                                  GestureDetector(
+                                    onTap: () {
                                       setState(() { _loadingPackage = true; _loadError = false; });
                                       _loadPackage();
                                     },
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: Colors.black87,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      shape: const StadiumBorder(),
-                                      textStyle: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(999),
+                                      child: BackdropFilter(
+                                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                                        child: Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(alpha: 0.35),
+                                            borderRadius: BorderRadius.circular(999),
+                                            border: Border.all(
+                                              color: Colors.white.withValues(alpha: 0.6),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.refresh_rounded,
+                                                size: 18,
+                                                color: Colors.black.withValues(alpha: 0.6),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Reintentar',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.black.withValues(alpha: 0.7),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                    child: const Text('Reintentar'),
                                   ),
                                 ],
                               )
