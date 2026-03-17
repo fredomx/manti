@@ -23,7 +23,7 @@ import 'core/theme/app_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  await NotificationService.instance.init();
+  NotificationService.instance.init(); // fire-and-forget, safe — all methods guard on _initialized
 
   // Directory for Isar
   final dir = await getApplicationDocumentsDirectory();
