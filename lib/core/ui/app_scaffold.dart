@@ -56,9 +56,9 @@ class AppScaffold extends StatelessWidget {
                   settings: const LiquidGlassSettings(
                     thickness: 18,
                     blur: 0.8,
-                    glassColor: Color(0x1FFFFFFF),
-                    lightIntensity: 1.3,
-                    ambientStrength: 0.8,
+                    glassColor: Color(0x44FFFFFF),
+                    lightIntensity: 1.4,
+                    ambientStrength: 0.9,
                     saturation: 1.1,
                   ),
                   child: Row(

@@ -68,7 +68,8 @@ class _MaintenanceLogView extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScaffold(
       floatingButton: MantiGlassFab(
-        icon: Icons.add,
+        icon: Icons.add_rounded,
+        label: 'Nuevo registro',
         onPressed: () => showNewLogSheet(context, item.category),
       ),
       body: BlocBuilder<LogsCubit, LogsState>(

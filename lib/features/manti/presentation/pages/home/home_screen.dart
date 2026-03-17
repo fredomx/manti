@@ -18,7 +18,8 @@ class HomeScreen extends StatelessWidget {
     return AppScaffold(
       body: const _HomeContent(),
       floatingButton: MantiGlassFab(
-        icon: Icons.add,
+        icon: Icons.add_rounded,
+        label: 'Agregar',
         onPressed: () => showNewItemSheet(context),
       ),
     );
