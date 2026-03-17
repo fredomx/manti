@@ -4,11 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:manti/core/services/backup_service.dart';
+import 'package:manti/core/services/entitlements_service.dart';
 import 'package:manti/core/ui/dialogs/confirm_delete_dialog.dart';
 import 'package:manti/features/manti/data/local/items_local_data_source.dart';
 import 'package:manti/features/manti/data/local/logs_local_data_source.dart';
+import '../paywall/paywall_sheet.dart';
 
-Future<void> showBackupSheet(BuildContext context) {
+Future<void> showBackupSheet(BuildContext context) async {
+  if (!EntitlementsService.instance.isPro) {
+    final bought = await showPaywallSheet(context);
+    if (!bought || !context.mounted) return;
+  }
+  if (!context.mounted) return;
   return showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,

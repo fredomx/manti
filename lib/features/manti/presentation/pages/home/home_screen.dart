@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:manti/core/ui/app_scaffold.dart';
@@ -6,10 +7,43 @@ import 'package:manti/core/ui/buttons/manti_glass_fab.dart';
 import 'package:manti/features/manti/domain/entities/manti_item.dart';
 import 'package:manti/features/manti/presentation/cubit/items_cubit.dart';
 import 'package:manti/features/manti/presentation/cubit/items_state.dart';
+import 'package:manti/core/config/app_config.dart';
+import 'package:manti/core/services/entitlements_service.dart';
+import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 import '../backup/backup_sheet.dart';
 import '../new_item/new_item_sheet.dart' show showNewItemSheet;
+import '../paywall/paywall_sheet.dart';
 import 'home_exports.dart';
 
+
+void _showMoreMenu(BuildContext context) {
+  showCupertinoModalPopup<void>(
+    context: context,
+    builder: (_) => CupertinoActionSheet(
+      actions: [
+        CupertinoActionSheetAction(
+          onPressed: () {
+            Navigator.of(context).pop();
+            showBackupSheet(context);
+          },
+          child: const Text('Copia de seguridad'),
+        ),
+        CupertinoActionSheetAction(
+          onPressed: () {
+            Navigator.of(context).pop();
+            RevenueCatUI.presentCustomerCenter();
+          },
+          child: const Text('Gestionar suscripción'),
+        ),
+      ],
+      cancelButton: CupertinoActionSheetAction(
+        isDefaultAction: true,
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Cancelar'),
+      ),
+    ),
+  );
+}
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -21,7 +55,15 @@ class HomeScreen extends StatelessWidget {
       floatingButton: MantiGlassFab(
         icon: Icons.add_rounded,
         label: 'Agregar',
-        onPressed: () => showNewItemSheet(context),
+        onPressed: () async {
+          final count = context.read<ItemsCubit>().state.items.length;
+          if (count >= AppConfig.freeItemLimit &&
+              !EntitlementsService.instance.isPro) {
+            final bought = await showPaywallSheet(context);
+            if (!bought || !context.mounted) return;
+          }
+          if (context.mounted) showNewItemSheet(context);
+        },
       ),
     );
   }
@@ -80,7 +122,7 @@ class _HomeContent extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        onPressed: () => showBackupSheet(context),
+                        onPressed: () => _showMoreMenu(context),
                         icon: Icon(
                           Icons.more_horiz_rounded,
                           color: Colors.black.withValues(alpha: 0.3),

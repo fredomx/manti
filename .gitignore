@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# RevenueCat / app config with secrets
+lib/core/config/app_config.dart
