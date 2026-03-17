@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:manti/core/utils/date_utils.dart';
 import 'package:manti/core/widgets/manti_icons.dart';
+import 'package:manti/core/ui/dialogs/confirm_delete_dialog.dart';
 import 'package:manti/features/manti/domain/entities/manti_item.dart';
 
 class MantiCard extends StatelessWidget {
@@ -54,9 +55,13 @@ class MantiCard extends StatelessWidget {
           if (onDelete != null)
             CupertinoActionSheetAction(
               isDestructiveAction: true,
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(context);
-                onDelete!();
+                final confirmed = await showDeleteConfirmDialog(
+                  context,
+                  title: item.name,
+                );
+                if (confirmed) onDelete!();
               },
               child: const Text('Eliminar'),
             ),

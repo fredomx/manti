@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:isar/isar.dart';
 import 'package:manti/core/ui/app_scaffold.dart';
+import 'package:manti/core/ui/dialogs/confirm_delete_dialog.dart';
 import 'package:manti/core/utils/date_utils.dart';
 import 'package:manti/core/widgets/manti_icons.dart';
 import 'package:manti/core/ui/buttons/manti_glass_fab.dart';
@@ -261,9 +262,13 @@ class _UpcomingCard extends StatelessWidget {
             await onComplete();
             return false;
           }
-          // Remove frequency: dismiss permanently
-          onRemove();
-          return true;
+          // Remove frequency: confirm before dismissing
+          final confirmed = await showDeleteConfirmDialog(
+            context,
+            title: service.title,
+          );
+          if (confirmed) onRemove();
+          return confirmed;
         },
         background: _SwipeBackground(
           alignment: Alignment.centerLeft,
@@ -689,7 +694,10 @@ class _SwipeableLogCard extends StatelessWidget {
             await onEdit();
             return false;
           }
-          return true;
+          return showDeleteConfirmDialog(
+            context,
+            title: log.title?.isNotEmpty == true ? log.title! : 'Mantenimiento',
+          );
         },
         onDismissed: (_) => onDelete(),
         background: _SwipeBackground(
