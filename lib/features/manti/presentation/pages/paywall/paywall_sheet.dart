@@ -218,13 +218,35 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                                 ),
                                 child: const Text('[DEBUG] Simular compra Pro'),
                               )
-                            : Text(
-                                'Producto no disponible. Inténtalo más tarde.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black.withValues(alpha: 0.4),
-                                ),
+                            : Column(
+                                children: [
+                                  Text(
+                                    'No se pudo cargar el producto. Comprueba tu conexión e inténtalo de nuevo.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.black.withValues(alpha: 0.4),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  FilledButton(
+                                    onPressed: () {
+                                      setState(() { _loadingPackage = true; _loadError = false; });
+                                      _loadPackage();
+                                    },
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: Colors.black87,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      shape: const StadiumBorder(),
+                                      textStyle: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    child: const Text('Reintentar'),
+                                  ),
+                                ],
                               )
                         : FilledButton(
                             onPressed: _purchase,
