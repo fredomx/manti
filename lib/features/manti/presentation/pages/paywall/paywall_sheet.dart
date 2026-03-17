@@ -6,9 +6,6 @@ import 'package:manti/core/config/app_constants.dart';
 import 'package:manti/core/services/entitlements_service.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
-// Product ID is fetched directly from StoreKit — bypasses RevenueCat backend
-// validation so purchases work even before Apple formally approves the IAP.
-
 
 /// Shows the paywall and returns `true` if the user successfully unlocks Pro.
 Future<bool> showPaywallSheet(BuildContext context) async {
