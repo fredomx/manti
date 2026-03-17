@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:manti/core/services/notification_service.dart';
 import 'package:manti/features/manti/domain/entities/manti_item.dart';
 import 'package:manti/features/manti/presentation/cubit/items_state.dart';
 import 'package:manti/features/manti/data/local/items_local_data_source.dart';
@@ -39,6 +40,7 @@ class ItemsCubit extends Cubit<ItemsState> {
   }
 
   Future<void> deleteItem(String idLocal) async {
+    await NotificationService.instance.cancelForItem(idLocal);
     await _local.deleteByIdLocal(idLocal);
   }
 

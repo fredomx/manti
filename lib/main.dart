@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:isar/isar.dart';
+import 'package:manti/core/services/notification_service.dart';
 import 'package:path_provider/path_provider.dart';
 
 // Isar Schemas
@@ -22,6 +23,7 @@ import 'core/theme/app_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  await NotificationService.instance.init();
 
   // Directory for Isar
   final dir = await getApplicationDocumentsDirectory();

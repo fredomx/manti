@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:manti/core/services/notification_service.dart';
 import 'package:manti/features/manti/domain/entities/maintenance_log.dart';
 import 'package:manti/features/manti/data/local/logs_local_data_source.dart';
 import 'package:manti/features/manti/data/local/items_local_data_source.dart';
@@ -50,8 +51,9 @@ class LogsCubit extends Cubit<LogsState> {
     double? cost,
     int? frequencyDays,
   }) async {
-    final now = DateTime.now();
+    if (frequencyDays != null) await NotificationService.instance.requestPermission();
 
+    final now = DateTime.now();
     final log = MaintenanceLog(
       idLocal: now.microsecondsSinceEpoch.toString(),
       itemId: itemId,
@@ -137,6 +139,12 @@ class LogsCubit extends Cubit<LogsState> {
       nextMaintenance: nextMaintenance,
       updatedAt: DateTime.now(),
     ));
+
+    await NotificationService.instance.rescheduleForItem(
+      itemId: itemId,
+      itemName: item.name,
+      logs: allLogs,
+    );
   }
 
   @override
