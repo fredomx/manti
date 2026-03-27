@@ -10,6 +10,8 @@ import 'package:manti/features/manti/presentation/cubit/logs_cubit.dart';
 const _backgroundColor = Color(0xE6FFFFFF);
 const _accentColor = Color(0xFF0A84FF);
 
+enum _LogMode { logged, upcoming }
+
 Future<void> showNewLogSheet(
   BuildContext context,
   MantiCategory category,
@@ -63,6 +65,7 @@ class _LogSheetState extends State<_LogSheet> {
   late final TextEditingController _costController;
   late final TextEditingController _customFrequencyController;
   late DateTime _selectedDate;
+  late _LogMode _mode;
   int? _selectedFrequencyDays;
   bool _customFrequencyMode = false;
 
@@ -84,6 +87,16 @@ class _LogSheetState extends State<_LogSheet> {
     );
     _selectedDate = log?.date ?? DateTime.now();
     _selectedFrequencyDays = log?.frequencyDays;
+
+    // Determine mode from existing log date, or default to logged for new entries
+    if (log != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final logDay = DateTime(log.date.year, log.date.month, log.date.day);
+      _mode = logDay.isAfter(today) ? _LogMode.upcoming : _LogMode.logged;
+    } else {
+      _mode = _LogMode.logged;
+    }
 
     final isCustom = log?.frequencyDays != null &&
         !_presetDays.contains(log!.frequencyDays);
@@ -113,6 +126,22 @@ class _LogSheetState extends State<_LogSheet> {
       _customFrequencyMode = true;
       final days = int.tryParse(_customFrequencyController.text.trim());
       _selectedFrequencyDays = (days != null && days > 0) ? days : null;
+    });
+  }
+
+  void _switchMode(_LogMode mode) {
+    if (_mode == mode) return;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selectedDay =
+        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    setState(() {
+      _mode = mode;
+      if (mode == _LogMode.upcoming && !selectedDay.isAfter(today)) {
+        _selectedDate = now.add(const Duration(days: 7));
+      } else if (mode == _LogMode.logged && selectedDay.isAfter(today)) {
+        _selectedDate = now;
+      }
     });
   }
 
@@ -231,14 +260,18 @@ class _LogSheetState extends State<_LogSheet> {
               ),
             ),
 
-            // Cupertino wheel — allows past and future dates
+            // Cupertino wheel — range constrained by mode
             SizedBox(
               height: 216,
               child: CupertinoDatePicker(
                 mode: CupertinoDatePickerMode.date,
                 initialDateTime: _selectedDate,
-                minimumDate: DateTime(2000),
-                maximumDate: DateTime.now().add(const Duration(days: 730)),
+                minimumDate: _mode == _LogMode.upcoming
+                    ? DateTime.now().add(const Duration(days: 1))
+                    : DateTime(2000),
+                maximumDate: _mode == _LogMode.logged
+                    ? DateTime.now()
+                    : DateTime.now().add(const Duration(days: 730)),
                 onDateTimeChanged: (date) => tempDate = date,
               ),
             ),
@@ -279,12 +312,21 @@ class _LogSheetState extends State<_LogSheet> {
             ),
             Gaps.v16,
 
-            Text(
-              _isEditing ? 'Editar registro' : 'Nuevo registro',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-              textAlign: TextAlign.center,
-            ),
-            Gaps.v24,
+            // Mode selector — only shown when creating; editing detects mode from date
+            if (!_isEditing) ...[
+              _ModeSelector(
+                mode: _mode,
+                onChanged: _switchMode,
+              ),
+              Gaps.v16,
+            ] else ...[
+              Text(
+                _mode == _LogMode.upcoming ? 'Editar recordatorio' : 'Editar registro',
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+              Gaps.v24,
+            ],
 
             const _FieldLabel('Título'),
             Gaps.v8,
@@ -305,52 +347,54 @@ class _LogSheetState extends State<_LogSheet> {
             ),
             Gaps.v16,
 
-            Row(
-              children: [
-                if (isVehicle) ...[
+            if (_mode == _LogMode.logged) ...[
+              Row(
+                children: [
+                  if (isVehicle) ...[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const _FieldLabel('Kilometraje'),
+                          Gaps.v8,
+                          _PillField(
+                            controller: _mileageController,
+                            hint: '0',
+                            suffix: 'km',
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Gaps.h12,
+                  ],
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const _FieldLabel('Kilometraje'),
+                        const _FieldLabel('Costo'),
                         Gaps.v8,
                         _PillField(
-                          controller: _mileageController,
-                          hint: '0',
-                          suffix: 'km',
+                          controller: _costController,
+                          hint: '0.00',
+                          prefix: '\$',
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
-                          textInputAction: TextInputAction.next,
+                          textInputAction: TextInputAction.done,
                         ),
                       ],
                     ),
                   ),
-                  Gaps.h12,
                 ],
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const _FieldLabel('Costo'),
-                      Gaps.v8,
-                      _PillField(
-                        controller: _costController,
-                        hint: '0.00',
-                        prefix: '\$',
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        textInputAction: TextInputAction.done,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            Gaps.v16,
+              ),
+              Gaps.v16,
+            ],
 
-            const _FieldLabel('Fecha'),
+            _FieldLabel(_mode == _LogMode.logged ? 'Cuándo' : 'Para cuándo'),
             Gaps.v8,
             GestureDetector(
               onTap: _pickDate,
@@ -431,7 +475,9 @@ class _LogSheetState extends State<_LogSheet> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              child: const Text('Guardar'),
+              child: Text(
+                _mode == _LogMode.upcoming ? 'Guardar recordatorio' : 'Guardar',
+              ),
             ),
             Gaps.v8,
 
@@ -557,6 +603,104 @@ class _FreqChip extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: isSelected ? Colors.white : Colors.black.withValues(alpha: 0.75),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Mode selector ─────────────────────────────────────────────────────────────
+
+class _ModeSelector extends StatelessWidget {
+  final _LogMode mode;
+  final ValueChanged<_LogMode> onChanged;
+
+  const _ModeSelector({required this.mode, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _ModeTab(
+              label: 'Ya lo hice',
+              icon: Icons.check_circle_outline_rounded,
+              selected: mode == _LogMode.logged,
+              onTap: () => onChanged(_LogMode.logged),
+            ),
+          ),
+          Expanded(
+            child: _ModeTab(
+              label: 'Lo haré',
+              icon: Icons.event_rounded,
+              selected: mode == _LogMode.upcoming,
+              onTap: () => onChanged(_LogMode.upcoming),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModeTab extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ModeTab({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: selected ? Colors.black87 : Colors.black38,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? Colors.black87 : Colors.black38,
               ),
             ),
           ],
