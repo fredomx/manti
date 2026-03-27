@@ -63,6 +63,7 @@ class _MaintenanceLogView extends StatelessWidget {
           frequencyDays: log.frequencyDays,
           sourceLogId: log.idLocal,
           isExplicitReminder: true,
+          daysUntil: log.date.difference(now).inDays,
         ));
       } else {
         // Past log → history; also seed recurring calculation
@@ -78,12 +79,14 @@ class _MaintenanceLogView extends StatelessWidget {
     for (final log in latestPastRecurring.values) {
       final displayTitle =
           log.title?.trim().isNotEmpty == true ? log.title!.trim() : 'Mantenimiento';
+      final nextDate = log.date.add(Duration(days: log.frequencyDays!));
       upcoming.add(_UpcomingService(
         title: displayTitle,
-        nextDate: log.date.add(Duration(days: log.frequencyDays!)),
+        nextDate: nextDate,
         frequencyDays: log.frequencyDays,
         sourceLogId: log.idLocal,
         isExplicitReminder: false,
+        daysUntil: nextDate.difference(now).inDays,
       ));
     }
 
@@ -247,16 +250,19 @@ class _UpcomingService {
   /// True when the user explicitly set a future date; false when calculated
   /// from a past log's recurrence.
   final bool isExplicitReminder;
+  /// Computed once at construction from the caller's DateTime.now() snapshot
+  /// so every card in the list shares the same reference instant.
+  final int daysUntil;
 
   const _UpcomingService({
     required this.title,
     required this.nextDate,
     required this.sourceLogId,
     required this.isExplicitReminder,
+    required this.daysUntil,
     this.frequencyDays,
   });
 
-  int get daysUntil => nextDate.difference(DateTime.now()).inDays;
   bool get isOverdue => daysUntil < 0;
   bool get isWarning => !isOverdue && daysUntil <= 30;
 }
@@ -274,6 +280,15 @@ class _UpcomingCard extends StatelessWidget {
     required this.onComplete,
     required this.onRemove,
   });
+
+  /// Returns the date of the next notification that will fire, or null if none.
+  DateTime? get _nextNotifDate {
+    final days = service.daysUntil;
+    if (days <= 0) return null;
+    if (days > 30) return service.nextDate.subtract(const Duration(days: 30));
+    if (days > 7) return service.nextDate.subtract(const Duration(days: 7));
+    return service.nextDate; // day-of notification
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -336,80 +351,110 @@ class _UpcomingCard extends StatelessWidget {
               width: 1,
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Status dot
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 12),
+              Row(
+                children: [
+                  // Status dot
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
 
-              // Title + date
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      service.title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
+                  // Title + date
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          service.title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          fmtDateShort(service.nextDate),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.black45,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Frequency badge (only if recurring)
+                  if (service.frequencyDays != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        _fmtFrequency(service.frequencyDays!),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black45,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      fmtDateShort(service.nextDate),
-                      style: const TextStyle(
+                  const SizedBox(width: 8),
+
+                  // Status badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusBg,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      statusLabel,
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Colors.black45,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // Notification hint
+              if (_nextNotifDate != null) ...[
+                const SizedBox(height: 10),
+                Divider(height: 1, thickness: 0.5, color: Colors.black.withValues(alpha: 0.07)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.notifications_none_rounded,
+                      size: 12,
+                      color: Colors.black.withValues(alpha: 0.28),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Aviso el ${fmtDateShort(_nextNotifDate!)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.black.withValues(alpha: 0.35),
                       ),
                     ),
                   ],
                 ),
-              ),
-
-              // Frequency badge (only if recurring)
-              if (service.frequencyDays != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    _fmtFrequency(service.frequencyDays!),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black45,
-                    ),
-                  ),
-                ),
-              const SizedBox(width: 8),
-
-              // Status badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusBg,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  statusLabel,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: statusColor,
-                  ),
-                ),
-              ),
+              ],
             ],
           ),
         ),

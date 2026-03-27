@@ -551,19 +551,14 @@ class _ModeTab extends StatelessWidget {
         curve: Curves.easeInOutCubic,
         padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
-          color: selected ? Colors.white.withValues(alpha: 0.95) : Colors.transparent,
+          color: selected ? Colors.white.withValues(alpha: 0.92) : Colors.transparent,
           borderRadius: BorderRadius.circular(19),
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.10),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
+                    color: Colors.black.withValues(alpha: 0.07),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
                   ),
                 ]
               : null,
@@ -674,13 +669,6 @@ class _SaveButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: _accentColor,
           borderRadius: BorderRadius.circular(999),
-          boxShadow: [
-            BoxShadow(
-              color: _accentColor.withValues(alpha: 0.35),
-              blurRadius: 20,
-              offset: const Offset(0, 6),
-            ),
-          ],
         ),
         alignment: Alignment.center,
         child: Text(
@@ -784,21 +772,7 @@ class _FreqChip extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.10),
             width: 1,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: _accentColor.withValues(alpha: 0.25),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
+          boxShadow: null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -853,9 +827,9 @@ class _GlassField extends StatelessWidget {
         borderRadius: BorderRadius.circular(maxLines > 1 ? 16 : 14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
