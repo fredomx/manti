@@ -78,8 +78,8 @@ class MantiItem extends Equatable {
     Object? customCategory = _unset,
     String? iconName,
     int? colorValue,
-    DateTime? lastMaintenance,
-    DateTime? nextMaintenance,
+    Object? lastMaintenance = _unset,
+    Object? nextMaintenance = _unset,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -93,8 +93,12 @@ class MantiItem extends Equatable {
           : customCategory as String?,
       iconName: iconName ?? this.iconName,
       colorValue: colorValue ?? this.colorValue,
-      lastMaintenance: lastMaintenance ?? this.lastMaintenance,
-      nextMaintenance: nextMaintenance ?? this.nextMaintenance,
+      lastMaintenance: identical(lastMaintenance, _unset)
+          ? this.lastMaintenance
+          : lastMaintenance as DateTime?,
+      nextMaintenance: identical(nextMaintenance, _unset)
+          ? this.nextMaintenance
+          : nextMaintenance as DateTime?,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
