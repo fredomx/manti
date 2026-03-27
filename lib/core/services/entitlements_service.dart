@@ -21,7 +21,7 @@ class EntitlementsService {
   }
 
   Future<bool> purchase(StoreProduct product) async {
-    final result = await Purchases.purchaseStoreProduct(product);
+    final result = await Purchases.purchase(PurchaseParams.storeProduct(product));
     _update(result.customerInfo);
     return _isPro;
   }

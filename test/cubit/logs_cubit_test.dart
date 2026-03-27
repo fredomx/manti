@@ -22,7 +22,7 @@ class FakeMaintenanceLog extends Fake implements MaintenanceLog {}
 
 /// A no-op platform implementation that satisfies MockPlatformInterfaceMixin
 /// so PlatformInterface.verifyToken allows it as FlutterLocalNotificationsPlatform.instance.
-/// resolvePlatformSpecificImplementation<IOS/Android>() returns null for this
+/// resolvePlatformSpecificImplementation returns null for this
 /// type, making requestPermission() a safe no-op in tests.
 class FakeFlutterLocalNotificationsPlatform extends Mock
     with MockPlatformInterfaceMixin

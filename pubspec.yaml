@@ -71,6 +71,8 @@ dev_dependencies:
 
   # Testing
   mocktail: ^1.0.4
+  flutter_local_notifications_platform_interface: any
+  plugin_platform_interface: any
 
 flutter_launcher_icons:
   android: true
