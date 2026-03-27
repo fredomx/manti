@@ -207,7 +207,7 @@ class _LogSheetState extends State<_LogSheet> {
                     ),
                   ),
                   const Text(
-                    'Fecha del registro',
+                    'Fecha',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -231,14 +231,14 @@ class _LogSheetState extends State<_LogSheet> {
               ),
             ),
 
-            // Cupertino wheel
+            // Cupertino wheel — allows past and future dates
             SizedBox(
               height: 216,
               child: CupertinoDatePicker(
                 mode: CupertinoDatePickerMode.date,
                 initialDateTime: _selectedDate,
                 minimumDate: DateTime(2000),
-                maximumDate: DateTime.now(),
+                maximumDate: DateTime.now().add(const Duration(days: 730)),
                 onDateTimeChanged: (date) => tempDate = date,
               ),
             ),

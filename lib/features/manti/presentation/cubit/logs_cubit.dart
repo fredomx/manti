@@ -51,9 +51,13 @@ class LogsCubit extends Cubit<LogsState> {
     double? cost,
     int? frequencyDays,
   }) async {
-    if (frequencyDays != null) await NotificationService.instance.requestPermission();
-
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final logDay = DateTime(date.year, date.month, date.day);
+    if (frequencyDays != null || logDay.isAfter(today)) {
+      await NotificationService.instance.requestPermission();
+    }
+
     final log = MaintenanceLog(
       idLocal: now.microsecondsSinceEpoch.toString(),
       itemId: itemId,
@@ -92,6 +96,23 @@ class LogsCubit extends Cubit<LogsState> {
     );
   }
 
+  /// Marks an explicit future-dated reminder as done today (moves it to history).
+  Future<void> completeExplicitReminder(String logId) async {
+    final source = state.logs.where((l) => l.idLocal == logId).firstOrNull;
+    if (source == null) return;
+    await updateLog(MaintenanceLog(
+      idLocal: source.idLocal,
+      itemId: source.itemId,
+      date: DateTime.now(),
+      title: source.title,
+      notes: source.notes,
+      mileage: source.mileage,
+      cost: source.cost,
+      frequencyDays: source.frequencyDays,
+      createdAt: source.createdAt,
+    ));
+  }
+
   /// Removes the recurrence from a service without deleting the history entry.
   Future<void> removeServiceFrequency(String sourceLogId) async {
     final source = state.logs.where((l) => l.idLocal == sourceLogId).firstOrNull;
@@ -116,23 +137,40 @@ class LogsCubit extends Cubit<LogsState> {
     // Single DB read — already sorted desc by date.
     final allLogs = await _local.getByItem(itemId);
 
-    final latestDate = allLogs.isNotEmpty ? allLogs.first.date : null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
 
-    // Group recurring logs by normalized title so casing/whitespace differences
-    // don't create duplicate schedules. putIfAbsent keeps the most recent log
-    // per service because allLogs is already sorted desc.
+    // Split past vs future logs (date-level comparison).
+    final pastLogs = allLogs.where((l) {
+      final d = DateTime(l.date.year, l.date.month, l.date.day);
+      return !d.isAfter(today);
+    }).toList();
+
+    final futureLogs = allLogs.where((l) {
+      final d = DateTime(l.date.year, l.date.month, l.date.day);
+      return d.isAfter(today);
+    }).toList();
+
+    // lastMaintenance = most recent past log (allLogs sorted desc so pastLogs too).
+    final latestDate = pastLogs.isNotEmpty ? pastLogs.first.date : null;
+
+    // Recurring calculation from PAST logs only.
     final latestPerService = <String, MaintenanceLog>{};
-    for (final log in allLogs) {
+    for (final log in pastLogs) {
       if (log.frequencyDays == null) continue;
       final key = log.title?.trim().toLowerCase() ?? '';
       latestPerService.putIfAbsent(key, () => log);
     }
 
-    final nextMaintenance = latestPerService.isEmpty
+    // nextMaintenance = earliest of: calculated recurring dates OR explicit future dates.
+    final recurringDates =
+        latestPerService.values.map((l) => l.date.add(Duration(days: l.frequencyDays!)));
+    final explicitFutureDates = futureLogs.map((l) => l.date);
+    final allUpcomingDates = [...recurringDates, ...explicitFutureDates];
+
+    final nextMaintenance = allUpcomingDates.isEmpty
         ? null
-        : latestPerService.values
-            .map((l) => l.date.add(Duration(days: l.frequencyDays!)))
-            .reduce((a, b) => a.isBefore(b) ? a : b);
+        : allUpcomingDates.reduce((a, b) => a.isBefore(b) ? a : b);
 
     await _items.upsert(item.copyWith(
       lastMaintenance: latestDate,

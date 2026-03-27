@@ -103,15 +103,31 @@ class NotificationService {
     }
     _activeIds[itemId] = [];
 
-    // Latest log per service title (logs already sorted desc)
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final newIds = <int>[];
+
+    // ── 1. Explicit future-dated reminders ────────────────────────────────────
+    for (final log in logs) {
+      final logDay = DateTime(log.date.year, log.date.month, log.date.day);
+      if (!logDay.isAfter(today)) continue;
+
+      final svc = log.title?.trim().isNotEmpty == true ? log.title!.trim() : 'Recordatorio';
+      final key = 'reminder_${log.idLocal}';
+
+      await _schedule(_id(itemId, key, 0), itemName, 'En 1 mes: $svc',    _at9am(log.date.subtract(const Duration(days: 30))), newIds);
+      await _schedule(_id(itemId, key, 1), itemName, 'En 1 semana: $svc', _at9am(log.date.subtract(const Duration(days: 7))),  newIds);
+      await _schedule(_id(itemId, key, 2), itemName, 'Hoy toca: $svc',    _at9am(log.date),                                   newIds);
+    }
+
+    // ── 2. Calculated recurring services (from past logs only) ────────────────
     final latestPerService = <String, MaintenanceLog>{};
     for (final log in logs) {
       if (log.frequencyDays == null) continue;
+      final logDay = DateTime(log.date.year, log.date.month, log.date.day);
+      if (logDay.isAfter(today)) continue; // future logs don't seed recurring calc
       latestPerService.putIfAbsent(log.title?.trim().toLowerCase() ?? '', () => log);
     }
-
-    final now = DateTime.now();
-    final newIds = <int>[];
 
     for (final entry in latestPerService.entries) {
       final log = entry.value;
@@ -120,9 +136,9 @@ class NotificationService {
 
       final svc = log.title?.trim().isNotEmpty == true ? log.title!.trim() : 'Mantenimiento';
 
-      await _schedule(_id(itemId, entry.key, 0), itemName, 'En 1 mes: $svc',     _at9am(due.subtract(const Duration(days: 30))), newIds);
-      await _schedule(_id(itemId, entry.key, 1), itemName, 'En 1 semana: $svc',  _at9am(due.subtract(const Duration(days: 7))),  newIds);
-      await _schedule(_id(itemId, entry.key, 2), itemName, 'Hoy toca: $svc',     _at9am(due),                                   newIds);
+      await _schedule(_id(itemId, entry.key, 0), itemName, 'En 1 mes: $svc',    _at9am(due.subtract(const Duration(days: 30))), newIds);
+      await _schedule(_id(itemId, entry.key, 1), itemName, 'En 1 semana: $svc', _at9am(due.subtract(const Duration(days: 7))),  newIds);
+      await _schedule(_id(itemId, entry.key, 2), itemName, 'Hoy toca: $svc',    _at9am(due),                                   newIds);
     }
 
     _activeIds[itemId] = newIds;

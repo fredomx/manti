@@ -40,29 +40,55 @@ class _MaintenanceLogView extends StatelessWidget {
 
   const _MaintenanceLogView({required this.item});
 
-  // Groups recurring logs by normalized title and returns one upcoming service
-  // per group. Logs must be sorted desc by date (guaranteed by watchByItem).
-  static List<_UpcomingService> _computeUpcoming(List<MaintenanceLog> logs) {
-    // Normalized key → most recent log with a frequency set.
-    // putIfAbsent keeps the first (latest) occurrence thanks to desc sort.
-    final latestPerService = <String, MaintenanceLog>{};
+  // Returns upcoming services (explicit future reminders + calculated recurring)
+  // and filtered history (past-only logs). Logs must be sorted desc by date.
+  static (List<_UpcomingService>, List<MaintenanceLog>) _splitLogs(
+      List<MaintenanceLog> logs) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final upcoming = <_UpcomingService>[];
+    final history = <MaintenanceLog>[];
+    final latestPastRecurring = <String, MaintenanceLog>{};
+
     for (final log in logs) {
-      if (log.frequencyDays == null) continue;
-      final key = log.title?.trim().toLowerCase() ?? '';
-      latestPerService.putIfAbsent(key, () => log);
+      final logDay = DateTime(log.date.year, log.date.month, log.date.day);
+      if (logDay.isAfter(today)) {
+        // Future log → explicit reminder in upcoming section
+        final displayTitle =
+            log.title?.trim().isNotEmpty == true ? log.title!.trim() : 'Recordatorio';
+        upcoming.add(_UpcomingService(
+          title: displayTitle,
+          nextDate: log.date,
+          frequencyDays: log.frequencyDays,
+          sourceLogId: log.idLocal,
+          isExplicitReminder: true,
+        ));
+      } else {
+        // Past log → history; also seed recurring calculation
+        history.add(log);
+        if (log.frequencyDays != null) {
+          final key = log.title?.trim().toLowerCase() ?? '';
+          latestPastRecurring.putIfAbsent(key, () => log);
+        }
+      }
     }
 
-    return latestPerService.values.map((log) {
+    // Calculated recurring services from past logs
+    for (final log in latestPastRecurring.values) {
       final displayTitle =
           log.title?.trim().isNotEmpty == true ? log.title!.trim() : 'Mantenimiento';
-      return _UpcomingService(
+      upcoming.add(_UpcomingService(
         title: displayTitle,
         nextDate: log.date.add(Duration(days: log.frequencyDays!)),
-        frequencyDays: log.frequencyDays!,
+        frequencyDays: log.frequencyDays,
         sourceLogId: log.idLocal,
-      );
-    }).toList()
-      ..sort((a, b) => a.nextDate.compareTo(b.nextDate));
+        isExplicitReminder: false,
+      ));
+    }
+
+    upcoming.sort((a, b) => a.nextDate.compareTo(b.nextDate));
+    return (upcoming, history);
   }
 
   @override
@@ -75,9 +101,9 @@ class _MaintenanceLogView extends StatelessWidget {
       ),
       body: BlocBuilder<LogsCubit, LogsState>(
         builder: (context, state) {
+          final (upcoming, historyLogs) = _splitLogs(state.logs);
           final lastMaintenance =
-              state.logs.isNotEmpty ? state.logs.first.date : null;
-          final upcoming = _computeUpcoming(state.logs);
+              historyLogs.isNotEmpty ? historyLogs.first.date : null;
           return CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
@@ -107,13 +133,13 @@ class _MaintenanceLogView extends StatelessWidget {
                   child: _EmptyLogs(),
                 )
               else ...[
-                // ── Upcoming services ─────────────────────────────────────
+                // ── Upcoming services & reminders ─────────────────────────
                 if (upcoming.isNotEmpty) ...[
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
                     sliver: SliverToBoxAdapter(
                       child: Text(
-                        'Próximos servicios',
+                        'Próximos',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -133,12 +159,20 @@ class _MaintenanceLogView extends StatelessWidget {
                         return _UpcomingCard(
                           key: ValueKey(svc.sourceLogId),
                           service: svc,
-                          onComplete: () => context
-                              .read<LogsCubit>()
-                              .completeUpcomingService(svc.sourceLogId),
-                          onRemove: () => context
-                              .read<LogsCubit>()
-                              .removeServiceFrequency(svc.sourceLogId),
+                          onComplete: svc.isExplicitReminder
+                              ? () => context
+                                  .read<LogsCubit>()
+                                  .completeExplicitReminder(svc.sourceLogId)
+                              : () => context
+                                  .read<LogsCubit>()
+                                  .completeUpcomingService(svc.sourceLogId),
+                          onRemove: svc.isExplicitReminder
+                              ? () => context
+                                  .read<LogsCubit>()
+                                  .deleteLog(svc.sourceLogId)
+                              : () => context
+                                  .read<LogsCubit>()
+                                  .removeServiceFrequency(svc.sourceLogId),
                         );
                       },
                     ),
@@ -146,37 +180,43 @@ class _MaintenanceLogView extends StatelessWidget {
                 ],
 
                 // ── History ───────────────────────────────────────────────
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
-                  sliver: SliverToBoxAdapter(
-                    child: Text(
-                      'Historial',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black.withValues(alpha: 0.35),
-                        letterSpacing: 0.8,
+                if (historyLogs.isNotEmpty) ...[
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+                    sliver: SliverToBoxAdapter(
+                      child: Text(
+                        'Historial',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black.withValues(alpha: 0.35),
+                          letterSpacing: 0.8,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 160),
-                  sliver: SliverList.separated(
-                    itemCount: state.logs.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final log = state.logs[index];
-                      return _SwipeableLogCard(
-                        key: ValueKey(log.idLocal),
-                        log: log,
-                        onEdit: () => showEditLogSheet(context, log, item.category),
-                        onDelete: () =>
-                            context.read<LogsCubit>().deleteLog(log.idLocal),
-                      );
-                    },
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 160),
+                    sliver: SliverList.separated(
+                      itemCount: historyLogs.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final log = historyLogs[index];
+                        return _SwipeableLogCard(
+                          key: ValueKey(log.idLocal),
+                          log: log,
+                          onEdit: () => showEditLogSheet(context, log, item.category),
+                          onDelete: () =>
+                              context.read<LogsCubit>().deleteLog(log.idLocal),
+                        );
+                      },
+                    ),
                   ),
-                ),
+                ] else ...[
+                  const SliverPadding(
+                    padding: EdgeInsets.only(bottom: 160),
+                  ),
+                ],
               ],
             ],
           );
@@ -202,14 +242,18 @@ String _fmtFrequency(int days) {
 class _UpcomingService {
   final String title;
   final DateTime nextDate;
-  final int frequencyDays;
+  final int? frequencyDays;
   final String sourceLogId;
+  /// True when the user explicitly set a future date; false when calculated
+  /// from a past log's recurrence.
+  final bool isExplicitReminder;
 
   const _UpcomingService({
     required this.title,
     required this.nextDate,
-    required this.frequencyDays,
     required this.sourceLogId,
+    required this.isExplicitReminder,
+    this.frequencyDays,
   });
 
   int get daysUntil => nextDate.difference(DateTime.now()).inDays;
@@ -279,7 +323,7 @@ class _UpcomingCard extends StatelessWidget {
         secondaryBackground: _SwipeBackground(
           alignment: Alignment.centerRight,
           color: Colors.redAccent,
-          icon: Icons.event_busy_rounded,
+          icon: Icons.delete_outline_rounded,
           label: 'Eliminar',
         ),
         child: Container(
@@ -331,22 +375,23 @@ class _UpcomingCard extends StatelessWidget {
                 ),
               ),
 
-              // Frequency badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  _fmtFrequency(service.frequencyDays),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black45,
+              // Frequency badge (only if recurring)
+              if (service.frequencyDays != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    _fmtFrequency(service.frequencyDays!),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black45,
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(width: 8),
 
               // Status badge
@@ -903,7 +948,7 @@ class _EmptyLogs extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Cada vez que hagas un mantenimiento, agrégalo aquí. Manti calculará la próxima fecha automáticamente.',
+            'Toca + para agregar un mantenimiento. Puedes elegir una fecha pasada o futura.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Colors.black45,
                   height: 1.5,
@@ -912,23 +957,18 @@ class _EmptyLogs extends StatelessWidget {
           const SizedBox(height: 24),
 
           _LogHint(
-            icon: Icons.add_circle_outline_rounded,
-            text: 'Toca el botón + cada vez que hagas un mantenimiento.',
-          ),
-          const SizedBox(height: 10),
-          _LogHint(
             icon: Icons.schedule_rounded,
-            text: 'Asigna una frecuencia al registro (ej. cada 3 meses) para que Manti calcule cuándo toca el siguiente.',
+            text: 'Asigna una frecuencia (ej. cada 3 meses) y Manti calculará cuándo toca el próximo.',
           ),
           const SizedBox(height: 10),
           _LogHint(
-            icon: Icons.event_repeat_rounded,
-            text: 'Los próximos servicios aparecen arriba del historial, con indicador de días restantes o atraso.',
+            icon: Icons.event_rounded,
+            text: 'Las fechas futuras aparecen en la sección de próximos con los días que faltan.',
           ),
           const SizedBox(height: 10),
           _LogHint(
             icon: Icons.swap_horiz_rounded,
-            text: 'Desliza un registro para editarlo o eliminarlo.',
+            text: 'Desliza cualquier entrada para editarla, completarla o eliminarla.',
           ),
         ],
       ),
