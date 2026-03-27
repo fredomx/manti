@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,8 +9,11 @@ import 'package:manti/features/manti/domain/entities/maintenance_log.dart';
 import 'package:manti/features/manti/domain/entities/manti_item.dart';
 import 'package:manti/features/manti/presentation/cubit/logs_cubit.dart';
 
-const _backgroundColor = Color(0xE6FFFFFF);
 const _accentColor = Color(0xFF0A84FF);
+// iOS grouped background, slightly transparent so backdrop blur is visible
+const _sheetBg = Color(0xEEF2F2F7);
+// iOS secondary label color
+const _labelColor = Color(0xFF8E8E93);
 
 enum _LogMode { logged, upcoming }
 
@@ -21,8 +26,10 @@ Future<void> showNewLogSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: _backgroundColor,
-    builder: (_) => _LogSheet(logsCubit: logsCubit, category: category),
+    backgroundColor: Colors.transparent,
+    builder: (_) => _GlassSheet(
+      child: _LogSheet(logsCubit: logsCubit, category: category),
+    ),
   );
 }
 
@@ -36,9 +43,35 @@ Future<void> showEditLogSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: _backgroundColor,
-    builder: (_) => _LogSheet(logsCubit: logsCubit, existing: log, category: category),
+    backgroundColor: Colors.transparent,
+    builder: (_) => _GlassSheet(
+      child: _LogSheet(logsCubit: logsCubit, existing: log, category: category),
+    ),
   );
+}
+
+// ── Glass sheet surface ────────────────────────────────────────────────────────
+
+class _GlassSheet extends StatelessWidget {
+  final Widget child;
+  const _GlassSheet({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: _sheetBg,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
 }
 
 // ── Sheet ─────────────────────────────────────────────────────────────────────
@@ -88,7 +121,6 @@ class _LogSheetState extends State<_LogSheet> {
     _selectedDate = log?.date ?? DateTime.now();
     _selectedFrequencyDays = log?.frequencyDays;
 
-    // Determine mode from existing log date, or default to logged for new entries
     if (log != null) {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
@@ -98,8 +130,8 @@ class _LogSheetState extends State<_LogSheet> {
       _mode = _LogMode.logged;
     }
 
-    final isCustom = log?.frequencyDays != null &&
-        !_presetDays.contains(log!.frequencyDays);
+    final isCustom =
+        log?.frequencyDays != null && !_presetDays.contains(log!.frequencyDays);
     _customFrequencyMode = isCustom;
     _customFrequencyController = TextEditingController(
       text: isCustom ? log.frequencyDays!.toString() : '',
@@ -162,7 +194,6 @@ class _LogSheetState extends State<_LogSheet> {
     final cost = double.tryParse(_costController.text.trim());
 
     if (_isEditing) {
-      // Reconstruct so we can explicitly clear frequencyDays if unset
       await widget.logsCubit.updateLog(
         MaintenanceLog(
           idLocal: widget.existing!.idLocal,
@@ -195,20 +226,16 @@ class _LogSheetState extends State<_LogSheet> {
 
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: _backgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Center(
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _GlassSheet(
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Center(
                 child: Container(
-                  width: 40,
+                  width: 36,
                   height: 4,
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.15),
@@ -216,73 +243,68 @@ class _LogSheetState extends State<_LogSheet> {
                   ),
                 ),
               ),
-            ),
-
-            // Header: Cancel / Title / Done
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: const Text(
-                      'Cancelar',
-                      style: TextStyle(
-                        color: Colors.black45,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text(
+                        'Cancelar',
+                        style: TextStyle(
+                          color: _accentColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
                     ),
-                  ),
-                  const Text(
-                    'Fecha',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      setState(() => _selectedDate = tempDate);
-                      Navigator.of(ctx).pop();
-                    },
-                    child: const Text(
-                      'Listo',
-                      style: TextStyle(
-                        color: _accentColor,
-                        fontSize: 15,
+                    Text(
+                      _mode == _LogMode.logged ? 'Cuándo' : 'Para cuándo',
+                      style: const TextStyle(
+                        fontSize: 17,
                         fontWeight: FontWeight.w600,
+                        color: Colors.black87,
                       ),
                     ),
-                  ),
-                ],
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _selectedDate = tempDate);
+                        Navigator.of(ctx).pop();
+                      },
+                      child: const Text(
+                        'Listo',
+                        style: TextStyle(
+                          color: _accentColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-
-            // Cupertino wheel — range constrained by mode
-            SizedBox(
-              height: 216,
-              child: CupertinoDatePicker(
-                mode: CupertinoDatePickerMode.date,
-                initialDateTime: _selectedDate,
-                minimumDate: _mode == _LogMode.upcoming
-                    ? DateTime.now().add(const Duration(days: 1))
-                    : DateTime(2000),
-                maximumDate: _mode == _LogMode.logged
-                    ? DateTime.now()
-                    : DateTime.now().add(const Duration(days: 730)),
-                onDateTimeChanged: (date) => tempDate = date,
+              SizedBox(
+                height: 216,
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.date,
+                  initialDateTime: _selectedDate,
+                  minimumDate: _mode == _LogMode.upcoming
+                      ? DateTime.now().add(const Duration(days: 1))
+                      : DateTime(2000),
+                  maximumDate: _mode == _LogMode.logged
+                      ? DateTime.now()
+                      : DateTime.now().add(const Duration(days: 730)),
+                  onDateTimeChanged: (date) => tempDate = date,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-          ],
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
   }
-
-  String _formatDate(DateTime date) => fmtDateShort(date);
 
   @override
   Widget build(BuildContext context) {
@@ -293,209 +315,384 @@ class _LogSheetState extends State<_LogSheet> {
       onTap: () => FocusScope.of(context).unfocus(),
       behavior: HitTestBehavior.opaque,
       child: Padding(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, bottom + 24),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(999),
+        padding: EdgeInsets.fromLTRB(20, 14, 20, bottom + 28),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
               ),
-            ),
-            Gaps.v16,
+              Gaps.v16,
 
-            // Mode selector — only shown when creating; editing detects mode from date
-            if (!_isEditing) ...[
-              _ModeSelector(
-                mode: _mode,
-                onChanged: _switchMode,
+              // Mode selector (new) / title (edit)
+              if (!_isEditing) ...[
+                _ModeSelector(mode: _mode, onChanged: _switchMode),
+                const SizedBox(height: 20),
+              ] else ...[
+                Text(
+                  _mode == _LogMode.upcoming ? 'Editar recordatorio' : 'Editar registro',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              // ── Título ───────────────────────────────────────────────
+              const _SectionLabel('Título'),
+              const SizedBox(height: 6),
+              _GlassField(
+                controller: _titleController,
+                hint: 'Ej. Cambio de aceite',
+                textInputAction: TextInputAction.next,
               ),
               Gaps.v16,
-            ] else ...[
-              Text(
-                _mode == _LogMode.upcoming ? 'Editar recordatorio' : 'Editar registro',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-                textAlign: TextAlign.center,
+
+              // ── Notas ────────────────────────────────────────────────
+              const _SectionLabel('Notas'),
+              const SizedBox(height: 6),
+              _GlassField(
+                controller: _notesController,
+                hint: 'Detalles opcionales...',
+                maxLines: 3,
+                textInputAction: TextInputAction.next,
               ),
-              Gaps.v24,
-            ],
+              Gaps.v16,
 
-            const _FieldLabel('Título'),
-            Gaps.v8,
-            _PillField(
-              controller: _titleController,
-              hint: 'Ej. Cambio de aceite',
-              textInputAction: TextInputAction.next,
-            ),
-            Gaps.v16,
-
-            const _FieldLabel('Notas'),
-            Gaps.v8,
-            _PillField(
-              controller: _notesController,
-              hint: 'Detalles del mantenimiento...',
-              maxLines: 3,
-              textInputAction: TextInputAction.next,
-            ),
-            Gaps.v16,
-
-            if (_mode == _LogMode.logged) ...[
-              Row(
-                children: [
-                  if (isVehicle) ...[
+              // ── Km / Costo (solo "ya lo hice") ───────────────────────
+              if (_mode == _LogMode.logged) ...[
+                Row(
+                  children: [
+                    if (isVehicle) ...[
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const _SectionLabel('Kilometraje'),
+                            const SizedBox(height: 6),
+                            _GlassField(
+                              controller: _mileageController,
+                              hint: '0',
+                              suffix: 'km',
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              textInputAction: TextInputAction.next,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Gaps.h12,
+                    ],
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const _FieldLabel('Kilometraje'),
-                          Gaps.v8,
-                          _PillField(
-                            controller: _mileageController,
-                            hint: '0',
-                            suffix: 'km',
+                          const _SectionLabel('Costo'),
+                          const SizedBox(height: 6),
+                          _GlassField(
+                            controller: _costController,
+                            hint: '0.00',
+                            prefix: '\$',
                             keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
-                            textInputAction: TextInputAction.next,
+                            textInputAction: TextInputAction.done,
                           ),
                         ],
                       ),
                     ),
-                    Gaps.h12,
                   ],
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _FieldLabel('Costo'),
-                        Gaps.v8,
-                        _PillField(
-                          controller: _costController,
-                          hint: '0.00',
-                          prefix: '\$',
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          textInputAction: TextInputAction.done,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
+                Gaps.v16,
+              ],
+
+              // ── Fecha ────────────────────────────────────────────────
+              _SectionLabel(_mode == _LogMode.logged ? 'Cuándo' : 'Para cuándo'),
+              const SizedBox(height: 6),
+              _DateButton(
+                date: _selectedDate,
+                mode: _mode,
+                onTap: _pickDate,
               ),
               Gaps.v16,
-            ],
 
-            _FieldLabel(_mode == _LogMode.logged ? 'Cuándo' : 'Para cuándo'),
-            Gaps.v8,
-            GestureDetector(
-              onTap: _pickDate,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: _accentColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.calendar_today_rounded,
-                        size: 14,
-                        color: _accentColor,
-                      ),
-                    ),
-                    Gaps.h12,
-                    Expanded(
-                      child: Text(
-                        _formatDate(_selectedDate),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      size: 18,
-                      color: Colors.black38,
-                    ),
-                  ],
-                ),
+              // ── Frecuencia ───────────────────────────────────────────
+              const _SectionLabel('Repetir'),
+              const SizedBox(height: 6),
+              _LogFrequencyPicker(
+                selected: _selectedFrequencyDays,
+                onSelected: _onPresetSelected,
+                isCustomSelected: _customFrequencyMode,
+                onCustomTap: _onCustomTap,
               ),
-            ),
-            Gaps.v16,
+              if (_customFrequencyMode) ...[
+                Gaps.v8,
+                _GlassField(
+                  controller: _customFrequencyController,
+                  hint: 'Ej. 45',
+                  suffix: 'días',
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                ),
+              ],
+              const SizedBox(height: 28),
 
-            const _FieldLabel('Frecuencia'),
-            Gaps.v8,
-            _LogFrequencyPicker(
-              selected: _selectedFrequencyDays,
-              onSelected: _onPresetSelected,
-              isCustomSelected: _customFrequencyMode,
-              onCustomTap: _onCustomTap,
-            ),
-            if (_customFrequencyMode) ...[
+              // ── Guardar ──────────────────────────────────────────────
+              _SaveButton(
+                label: _mode == _LogMode.upcoming
+                    ? 'Guardar recordatorio'
+                    : 'Guardar',
+                onPressed: _save,
+              ),
               Gaps.v8,
-              _PillField(
-                controller: _customFrequencyController,
-                hint: 'Ej. 45',
-                suffix: 'días',
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.done,
-              ),
-            ],
-            Gaps.v24,
 
-            FilledButton(
-              onPressed: _save,
-              style: FilledButton.styleFrom(
-                backgroundColor: _accentColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: const StadiumBorder(),
-                textStyle: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: TextButton.styleFrom(
+                  foregroundColor: _accentColor,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text(
+                  'Cancelar',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
                 ),
               ),
-              child: Text(
-                _mode == _LogMode.upcoming ? 'Guardar recordatorio' : 'Guardar',
-              ),
-            ),
-            Gaps.v8,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.black45,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+// ── Mode selector ─────────────────────────────────────────────────────────────
+
+class _ModeSelector extends StatelessWidget {
+  final _LogMode mode;
+  final ValueChanged<_LogMode> onChanged;
+
+  const _ModeSelector({required this.mode, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.28),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.7),
+              width: 0.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _ModeTab(
+                  label: 'Ya lo hice',
+                  icon: Icons.check_circle_outline_rounded,
+                  selected: mode == _LogMode.logged,
+                  onTap: () => onChanged(_LogMode.logged),
+                ),
               ),
-              child: const Text(
-                'Cancelar',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+              Expanded(
+                child: _ModeTab(
+                  label: 'Lo haré',
+                  icon: Icons.event_rounded,
+                  selected: mode == _LogMode.upcoming,
+                  onTap: () => onChanged(_LogMode.upcoming),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ModeTab extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ModeTab({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOutCubic,
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white.withValues(alpha: 0.95) : Colors.transparent,
+          borderRadius: BorderRadius.circular(19),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.10),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: selected ? _accentColor : Colors.black.withValues(alpha: 0.3),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                color: selected ? Colors.black87 : Colors.black.withValues(alpha: 0.3),
               ),
             ),
           ],
         ),
       ),
-    ));
+    );
+  }
+}
+
+// ── Date button ───────────────────────────────────────────────────────────────
+
+class _DateButton extends StatelessWidget {
+  final DateTime date;
+  final _LogMode mode;
+  final VoidCallback onTap;
+
+  const _DateButton({required this.date, required this.mode, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: _accentColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(
+                mode == _LogMode.upcoming
+                    ? Icons.event_rounded
+                    : Icons.calendar_today_rounded,
+                size: 15,
+                color: _accentColor,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                fmtDateShort(date),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 16,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: Colors.black.withValues(alpha: 0.25),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Save button ───────────────────────────────────────────────────────────────
+
+class _SaveButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+
+  const _SaveButton({required this.label, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: _accentColor,
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: [
+            BoxShadow(
+              color: _accentColor.withValues(alpha: 0.35),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -525,28 +722,28 @@ class _LogFrequencyPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44,
+      height: 40,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
           _FreqChip(
-            label: 'Ninguna',
+            label: 'No',
             icon: Icons.block_rounded,
             isSelected: !isCustomSelected && selected == null,
             onTap: () => onSelected(null),
           ),
           const SizedBox(width: 8),
           ..._options.map((opt) => Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: _FreqChip(
-              label: opt.label,
-              icon: Icons.schedule_rounded,
-              isSelected: !isCustomSelected && selected == opt.days,
-              onTap: () => onSelected(opt.days),
-            ),
-          )),
+                padding: const EdgeInsets.only(right: 8),
+                child: _FreqChip(
+                  label: opt.label,
+                  icon: Icons.repeat_rounded,
+                  isSelected: !isCustomSelected && selected == opt.days,
+                  onTap: () => onSelected(opt.days),
+                ),
+              )),
           _FreqChip(
-            label: 'Personalizado',
+            label: 'Otro',
             icon: Icons.edit_rounded,
             isSelected: isCustomSelected,
             onTap: onCustomTap,
@@ -575,34 +772,49 @@ class _FreqChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected
-              ? Colors.black.withValues(alpha: 0.85)
-              : Colors.black.withValues(alpha: 0.06),
+          color: isSelected ? _accentColor : Colors.white,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color: isSelected
-                ? Colors.black.withValues(alpha: 0.1)
-                : Colors.black.withValues(alpha: 0.06),
+                ? _accentColor
+                : Colors.black.withValues(alpha: 0.10),
+            width: 1,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: _accentColor.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              size: 14,
-              color: isSelected ? Colors.white : Colors.black54,
+              size: 13,
+              color: isSelected ? Colors.white : Colors.black.withValues(alpha: 0.35),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             Text(
               label,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : Colors.black.withValues(alpha: 0.75),
+                fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.white : Colors.black.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -612,125 +824,9 @@ class _FreqChip extends StatelessWidget {
   }
 }
 
-// ── Mode selector ─────────────────────────────────────────────────────────────
+// ── Glass input field ─────────────────────────────────────────────────────────
 
-class _ModeSelector extends StatelessWidget {
-  final _LogMode mode;
-  final ValueChanged<_LogMode> onChanged;
-
-  const _ModeSelector({required this.mode, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _ModeTab(
-              label: 'Ya lo hice',
-              icon: Icons.check_circle_outline_rounded,
-              selected: mode == _LogMode.logged,
-              onTap: () => onChanged(_LogMode.logged),
-            ),
-          ),
-          Expanded(
-            child: _ModeTab(
-              label: 'Lo haré',
-              icon: Icons.event_rounded,
-              selected: mode == _LogMode.upcoming,
-              onTap: () => onChanged(_LogMode.upcoming),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ModeTab extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ModeTab({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: selected ? Colors.black87 : Colors.black38,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? Colors.black87 : Colors.black38,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Shared widgets ────────────────────────────────────────────────────────────
-
-class _FieldLabel extends StatelessWidget {
-  final String text;
-
-  const _FieldLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 12,
-        letterSpacing: 1.1,
-        color: Colors.black54,
-      ),
-    );
-  }
-}
-
-class _PillField extends StatelessWidget {
+class _GlassField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final int maxLines;
@@ -739,7 +835,7 @@ class _PillField extends StatelessWidget {
   final String? suffix;
   final TextInputAction? textInputAction;
 
-  const _PillField({
+  const _GlassField({
     required this.controller,
     required this.hint,
     this.maxLines = 1,
@@ -751,45 +847,84 @@ class _PillField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      textInputAction: textInputAction,
-      textCapitalization: TextCapitalization.sentences,
-      onSubmitted: (_) {
-        if (textInputAction == TextInputAction.done) {
-          FocusScope.of(context).unfocus();
-        }
-      },
-      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(
-          color: Colors.black38,
-          fontWeight: FontWeight.normal,
-        ),
-        prefixText: prefix,
-        suffixText: suffix,
-        prefixStyle: const TextStyle(
-          color: Colors.black54,
-          fontWeight: FontWeight.w600,
-        ),
-        suffixStyle: const TextStyle(
-          color: Colors.black45,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(maxLines > 1 ? 16 : 14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        maxLines: maxLines,
+        keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        textCapitalization: TextCapitalization.sentences,
+        onSubmitted: (_) {
+          if (textInputAction == TextInputAction.done) {
+            FocusScope.of(context).unfocus();
+          }
+        },
+        style: const TextStyle(
           fontWeight: FontWeight.w500,
-          fontSize: 13,
+          fontSize: 16,
+          color: Colors.black87,
         ),
-        filled: true,
-        fillColor: Colors.black.withValues(alpha: 0.08),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 14,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+            color: Colors.black.withValues(alpha: 0.25),
+            fontWeight: FontWeight.w400,
+            fontSize: 16,
+          ),
+          prefixText: prefix,
+          suffixText: suffix,
+          prefixStyle: TextStyle(
+            color: Colors.black.withValues(alpha: 0.45),
+            fontWeight: FontWeight.w500,
+            fontSize: 16,
+          ),
+          suffixStyle: TextStyle(
+            color: Colors.black.withValues(alpha: 0.35),
+            fontWeight: FontWeight.w400,
+            fontSize: 14,
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(maxLines > 1 ? 16 : 14),
+            borderSide: BorderSide.none,
+          ),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(maxLines > 1 ? 20 : 999),
-          borderSide: BorderSide.none,
-        ),
+      ),
+    );
+  }
+}
+
+// ── Section label ─────────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: _labelColor,
+        letterSpacing: 0,
       ),
     );
   }
