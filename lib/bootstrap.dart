@@ -13,6 +13,7 @@ import 'package:manti/features/manti/data/local/app_config_isar.dart';
 import 'package:manti/features/manti/data/local/items_local_data_source.dart';
 import 'package:manti/features/manti/presentation/cubit/items_cubit.dart';
 import 'package:manti/features/manti/presentation/pages/home/home_screen.dart';
+import 'package:manti/features/manti/presentation/pages/onboarding/onboarding_screen.dart';
 import 'core/theme/app_theme.dart';
 
 Future<void> bootstrap() async {
@@ -27,19 +28,24 @@ Future<void> bootstrap() async {
     directory: dir.path,
   );
 
+  final config = await isar.appConfigIsars.get(1);
+  final showOnboarding = config?.hasSeededMantiItems != true;
+
   runApp(
     RepositoryProvider<Isar>.value(
       value: isar,
       child: BlocProvider(
         create: (_) => ItemsCubit(ItemsLocalDataSource(isar)),
-        child: const MantiApp(),
+        child: MantiApp(showOnboarding: showOnboarding),
       ),
     ),
   );
 }
 
 class MantiApp extends StatelessWidget {
-  const MantiApp({super.key});
+  final bool showOnboarding;
+
+  const MantiApp({super.key, required this.showOnboarding});
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +53,7 @@ class MantiApp extends StatelessWidget {
       debugShowCheckedModeBanner: AppConfig.isDev,
       title: 'Manti',
       theme: appTheme,
-      home: const HomeScreen(),
+      home: showOnboarding ? const OnboardingScreen() : const HomeScreen(),
     );
   }
 }
